@@ -7,7 +7,7 @@ namespace App\Enums;
  */
 enum GameStatus: string
 {
-    case IN_PROGRESS = 'ongoing';
+    case ONGOING = 'ongoing';
     case WON = 'won';
     case LOST = 'lost';
     case ABANDONED = 'abandoned';

@@ -35,7 +35,7 @@ final class PrizeAvailabilityService
 
             $counter = DailyPrizeCounter::query()
                 ->where('prize_id', $prize->id)
-                ->where('counter_date', $counterDate)
+                ->whereDate('counter_date', $counterDate)
                 ->lockForUpdate()
                 ->first();
 

@@ -67,17 +67,22 @@ class Prize extends Model
         }
 
         $date = ($date ?? now())->setTimezone($this->campaign->timezone);
+        $counterDate = $date->toDateString();
 
-        return $this->dailyCounters()->firstOrCreate(
-            [
-                'counter_date' => $date->toDateString(),
-            ],
-            [
-                'daily_limit' => (int) $this->daily_limit,
-                'reserved_count' => 0,
-                'awarded_count' => 0,
-            ]
-        );
+        $counter = $this->dailyCounters()
+            ->whereDate('counter_date', $counterDate)
+            ->first();
+
+        if ($counter) {
+            return $counter;
+        }
+
+        return $this->dailyCounters()->create([
+            'counter_date' => $counterDate,
+            'daily_limit' => (int) $this->daily_limit,
+            'reserved_count' => 0,
+            'awarded_count' => 0,
+        ]);
     }
 
     public function scopeSegment(Builder $query, string|PrizeSegment $segment)

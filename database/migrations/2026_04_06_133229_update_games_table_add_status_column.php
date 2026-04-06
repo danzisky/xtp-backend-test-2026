@@ -13,7 +13,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('games', function (Blueprint $table) {
-            $table->enum('status', array_column(GameStatus::cases(), 'value'))->default(GameStatus::IN_PROGRESS->value)->after('prize_id');
+            $table->enum('status', array_column(GameStatus::cases(), 'value'))->default(GameStatus::ONGOING->value)->after('prize_id');
         });
     }
 
