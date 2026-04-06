@@ -594,6 +594,12 @@ class MainComponent extends Component {
         if (this._config.message) {
             this.refs.popup.setMessage(this._config.message);
             this.refs.popup.show();
+
+            if (this._config?.messageTimeout) {
+                setTimeout(() => {
+                    this.refs.popup.hide();
+                }, this._config.messageTimeout);
+            }
         }
         else {
             this.refs.popup.hide();

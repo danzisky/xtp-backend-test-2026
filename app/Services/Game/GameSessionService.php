@@ -209,8 +209,19 @@ final class GameSessionService
 
         $resolvedMessage = $message;
 
-        if ($resolvedMessage === null && $game->finished_at !== null && $game->prize_id !== null) {
-            $resolvedMessage = 'You won a prize!';
+        if ($resolvedMessage === null) {
+            if ($game->is_finished) {
+                $resolvedMessage = match ($game->status) {
+                    GameStatus::WON->value => 'You won a prize!',
+                    GameStatus::LOST->value => 'Game over. Better luck next time!',
+                    default => null,
+                };
+            } else {
+                $revealedCount = count($revealedTiles);
+                $matchesToWin = $game->matches_to_win;
+                $triesLeft = $game->max_tries - $revealedCount;
+                $resolvedMessage = "You need {$matchesToWin} matches to win. You have {$triesLeft} tries left. 🫡";
+            }
         }
 
         return [
@@ -219,6 +230,7 @@ final class GameSessionService
             'revealedTiles' => $revealedTiles,
             'reveledTiles' => $revealedTiles,
             'message' => $resolvedMessage,
+            'messageTimeout' => !$game->is_finished ? 3000 : null,
         ];
     }
 }

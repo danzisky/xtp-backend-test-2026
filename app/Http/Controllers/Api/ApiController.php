@@ -73,7 +73,7 @@ class ApiController extends Controller
                 if ($matchCount >= $game->matches_to_win) {
                     $this->gameSessionService->finalizeGame($game, true);
                     Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
-                    $body['message'] = 'You won a prize!';
+                    $body['message'] = 'You won a prize! 🏆';
 
                     return $this->response(Response::HTTP_OK, $body);
                 }
@@ -81,7 +81,7 @@ class ApiController extends Controller
                 if (! $game->can_scratch_tiles) {
                     $this->gameSessionService->finalizeGame($game, false);
                     Log::info('Player lost game', ['gameId' => $gameId, 'account' => $game->account]);
-                    $body['message'] = 'No more tries left. Game has ended.';
+                    $body['message'] = 'No more tries left. You lost 😪.';
                 }
 
                 return $this->response(Response::HTTP_OK, $body);
