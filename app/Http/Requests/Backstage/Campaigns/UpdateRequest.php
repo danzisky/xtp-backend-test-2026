@@ -45,6 +45,15 @@ class UpdateRequest extends FormRequest
             return;
         }
 
+        if ($matchesToWin > $maxTries) {
+            $validator->errors()->add(
+                'matches_to_win',
+                'Matches to win must be less than or equal to max tries.'
+            );
+
+            return;
+        }
+
         $boardSize = max(1, (int) config('scratchgame.boardsize', 5));
         $maxSupportedTries = $boardSize * $boardSize;
 

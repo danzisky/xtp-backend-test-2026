@@ -13,9 +13,10 @@ class FlipRequest extends FormRequest
 
     public function rules(): array
     {
+        $boardSize = max(1, (int) config('scratchgame.boardsize', 5));
         return [
             'gameId' => 'required|integer|min:1|exists:games,id',
-            'tileIndex' => 'required|integer|min:0|max:24',
+            'tileIndex' => "required|integer|min:0|max:" . ($boardSize * $boardSize - 1),
         ];
     }
 

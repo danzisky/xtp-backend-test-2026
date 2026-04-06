@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Data\Game\GameContextData;
+use App\Enums\GameMessage;
 use App\Http\Requests\Frontend\LoadCampaignRequest;
 use App\Models\Campaign;
 use App\Services\Game\GameSessionService;
@@ -34,7 +35,7 @@ class FrontendController extends Controller
             return $this->renderWithConfig([
                 'apiPath' => '/api/flip',
                 'gameId' => null,
-                'message' => 'Campaign has not started yet.',
+                'message' => GameMessage::CAMPAIGN_NOT_STARTED->value,
             ]);
         }
 
@@ -46,7 +47,7 @@ class FrontendController extends Controller
             return $this->renderWithConfig([
                 'apiPath' => '/api/flip',
                 'gameId' => null,
-                'message' => 'Campaign has ended.',
+                'message' => GameMessage::CAMPAIGN_ENDED->value,
             ]);
         }
 
@@ -78,7 +79,7 @@ class FrontendController extends Controller
             return $this->renderWithConfig([
                 'apiPath' => '/api/flip',
                 'gameId' => null,
-                'message' => 'An error occurred. Please try again.',
+                'message' => GameMessage::FRONTEND_GENERIC_ERROR->value,
             ]);
         }
     }

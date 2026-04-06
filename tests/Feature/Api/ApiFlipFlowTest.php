@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Enums\GameMessage;
 use App\Enums\GameStatus;
 use App\Enums\PrizeSegment;
 use App\Models\DailyPrizeCounter;
@@ -109,7 +110,7 @@ class ApiFlipFlowTest extends TestCase
         $final->assertOk()->assertJson(
             [
             'tileImage' => 'https://example.test/winner.png',
-            'message' => 'You won a prize!',
+            'message' => GameMessage::PRIZE_WON->value,
             ]
         );
 
@@ -156,7 +157,7 @@ class ApiFlipFlowTest extends TestCase
 
         $final->assertOk()->assertJson(
             [
-            'message' => 'No more tries left. Game has ended.',
+            'message' => GameMessage::NO_MORE_TRIES->value,
             ]
         );
 
@@ -198,7 +199,7 @@ class ApiFlipFlowTest extends TestCase
 
         $response->assertOk()->assertJson(
             [
-            'message' => 'Game has already finished.',
+            'message' => GameMessage::GAME_ALREADY_FINISHED->value,
             ]
         );
     }
@@ -227,7 +228,7 @@ class ApiFlipFlowTest extends TestCase
 
         $response->assertStatus(422)->assertJson(
             [
-            'message' => 'Game is not valid. Campaign is not active.',
+            'message' => GameMessage::GAME_CAMPAIGN_INACTIVE->value,
             ]
         );
     }

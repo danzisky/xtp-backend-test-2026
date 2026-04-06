@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\GameMessage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\FlipRequest;
 use App\Models\Game;
@@ -34,18 +35,18 @@ class ApiController extends Controller
 
                 if (! $game) {
                     Log::warning('Game not found', ['gameId' => $gameId]);
-                    return $this->response(Response::HTTP_NOT_FOUND, ['message' => 'Game not found.']);
+                    return $this->response(Response::HTTP_NOT_FOUND, ['message' => GameMessage::GAME_NOT_FOUND->value]);
                 }
 
                 if ($game->is_finished) {
                     Log::info('Game already finished', ['gameId' => $gameId]);
-                    return $this->response(Response::HTTP_OK, ['message' => 'Game has already finished.']);
+                    return $this->response(Response::HTTP_OK, ['message' => GameMessage::GAME_ALREADY_FINISHED->value]);
                 }
 
                 if (! $game->is_valid) {
                     $message = $game->campaign?->is_active
-                        ? 'Game is not valid. Please contact support.'
-                        : 'Game is not valid. Campaign is not active.';
+                        ? GameMessage::GAME_INVALID->value
+                        : GameMessage::GAME_CAMPAIGN_INACTIVE->value;
 
                     Log::warning('Invalid game detected', ['gameId' => $gameId, 'campaignActive' => $game->campaign?->is_active]);
                     return $this->response(Response::HTTP_UNPROCESSABLE_ENTITY, ['message' => $message]);
@@ -57,7 +58,7 @@ class ApiController extends Controller
                     Log::error('Failed to resolve tile', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
                     return $this->response(
                         Response::HTTP_UNPROCESSABLE_ENTITY,
-                        ['message' => 'An error occurred while processing the tile. Please contact support.']
+                        ['message' => GameMessage::TILE_PROCESSING_ERROR->value]
                     );
                 }
 
@@ -73,7 +74,7 @@ class ApiController extends Controller
                 if ($matchCount >= $game->matches_to_win) {
                     $this->gameSessionService->finalizeGame($game, true);
                     Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
-                    $body['message'] = 'You won a prize! 🏆';
+                    $body['message'] = GameMessage::PRIZE_WON->value;
 
                     return $this->response(Response::HTTP_OK, $body);
                 }
@@ -81,7 +82,7 @@ class ApiController extends Controller
                 if (! $game->can_scratch_tiles) {
                     $this->gameSessionService->finalizeGame($game, false);
                     Log::info('Player lost game', ['gameId' => $gameId, 'account' => $game->account]);
-                    $body['message'] = 'No more tries left. You lost 😪.';
+                    $body['message'] = GameMessage::NO_MORE_TRIES->value;
                 }
 
                 return $this->response(Response::HTTP_OK, $body);
@@ -97,7 +98,7 @@ class ApiController extends Controller
             ]);
 
             return response()->json(
-                ['message' => 'An error occurred. Please contact support.'],
+                ['message' => GameMessage::API_GENERIC_ERROR->value],
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }

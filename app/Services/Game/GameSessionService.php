@@ -3,6 +3,7 @@
 namespace App\Services\Game;
 
 use App\Data\Game\GameContextData;
+use App\Enums\GameMessage;
 use App\Enums\GameStatus;
 use App\Models\Game;
 use App\Models\Prize;
@@ -212,15 +213,15 @@ final class GameSessionService
         if ($resolvedMessage === null) {
             if ($game->is_finished) {
                 $resolvedMessage = match ($game->status) {
-                    GameStatus::WON->value => 'You won a prize!',
-                    GameStatus::LOST->value => 'Game over. Better luck next time!',
+                    GameStatus::WON->value => GameMessage::PRIZE_WON->value,
+                    GameStatus::LOST->value => GameMessage::FRONTEND_GAME_LOST->value,
                     default => null,
                 };
             } else {
                 $revealedCount = count($revealedTiles);
                 $matchesToWin = $game->matches_to_win;
                 $triesLeft = $game->max_tries - $revealedCount;
-                $resolvedMessage = "You need {$matchesToWin} matches to win. You have {$triesLeft} tries left. 🫡";
+                $resolvedMessage = GameMessage::ongoingProgress($matchesToWin, $triesLeft);
             }
         }
 
@@ -228,7 +229,6 @@ final class GameSessionService
             'apiPath' => '/api/flip',
             'gameId' => $game->id,
             'revealedTiles' => $revealedTiles,
-            'reveledTiles' => $revealedTiles,
             'message' => $resolvedMessage,
             'messageTimeout' => !$game->is_finished ? 3000 : null,
         ];

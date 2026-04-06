@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Frontend;
 
+use App\Enums\GameMessage;
 use App\Enums\PrizeSegment;
 use App\Models\DailyPrizeCounter;
 use App\Models\Game;
@@ -47,7 +48,7 @@ class FrontendGameFlowTest extends TestCase
         $config = $this->extractConfig($response);
 
         $this->assertNull($config['gameId']);
-        $this->assertSame('Campaign has not started yet.', $config['message']);
+        $this->assertSame(GameMessage::CAMPAIGN_NOT_STARTED->value, $config['message']);
     }
 
     public function test_frontend_returns_ended_campaign_message(): void
@@ -66,7 +67,7 @@ class FrontendGameFlowTest extends TestCase
         $config = $this->extractConfig($response);
 
         $this->assertNull($config['gameId']);
-        $this->assertSame('Campaign has ended.', $config['message']);
+        $this->assertSame(GameMessage::CAMPAIGN_ENDED->value, $config['message']);
     }
 
     public function test_frontend_creates_game_and_embeds_runtime_config(): void
@@ -93,8 +94,7 @@ class FrontendGameFlowTest extends TestCase
 
         $this->assertSame('/api/flip', $config['apiPath']);
         $this->assertSame([], $config['revealedTiles']);
-        $this->assertSame($config['revealedTiles'], $config['reveledTiles']);
-        $this->assertNull($config['message']);
+        $this->assertSame(GameMessage::ongoingProgress(3, 10), $config['message']);
         $this->assertSame('player-1', $game->account);
         $this->assertSame(PrizeSegment::Low->value, $game->segment);
         $this->assertCount(25, $game->tiles);
@@ -129,7 +129,6 @@ class FrontendGameFlowTest extends TestCase
         $this->assertCount(1, $config['revealedTiles']);
         $this->assertSame(8, $config['revealedTiles'][0]['index']);
         $this->assertSame('https://example.test/already-revealed.png', $config['revealedTiles'][0]['image']);
-        $this->assertSame($config['revealedTiles'], $config['reveledTiles']);
     }
 
     public function test_frontend_creates_losing_game_when_daily_caps_are_exhausted(): void
