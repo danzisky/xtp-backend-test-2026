@@ -9,6 +9,7 @@ use App\Models\GameTile;
 use App\Services\Game\GameSessionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class ApiController extends Controller
@@ -22,6 +23,9 @@ class ApiController extends Controller
         $gameId = $request->gameId();
         $tileIndex = $request->tileIndex();
 
+       Log::info('Flip request received', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
+   
+       try {
         $result = DB::transaction(function () use ($gameId, $tileIndex): array {
             $game = Game::query()
                 ->with('campaign')
@@ -29,10 +33,12 @@ class ApiController extends Controller
                 ->find($gameId);
 
             if (! $game) {
-                return $this->response(Response::HTTP_NOT_FOUND, ['message' => 'Game not found.']);
+                   Log::warning('Game not found', ['gameId' => $gameId]);
+                   return $this->response(Response::HTTP_NOT_FOUND, ['message' => 'Game not found.']);
             }
 
             if ($game->is_finished) {
+                   Log::info('Game already finished', ['gameId' => $gameId]);
                 return $this->response(Response::HTTP_OK, ['message' => 'Game has already finished.']);
             }
 
@@ -41,12 +47,14 @@ class ApiController extends Controller
                     ? 'Game is not valid. Please contact support.'
                     : 'Game is not valid. Campaign is not active.';
 
+                   Log::warning('Invalid game detected', ['gameId' => $gameId, 'campaignActive' => $game->campaign?->is_active]);
                 return $this->response(Response::HTTP_UNPROCESSABLE_ENTITY, ['message' => $message]);
             }
 
             $tile = $this->resolveTile($game, $tileIndex);
 
             if (! $tile) {
+                   Log::error('Failed to resolve tile', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
                 return $this->response(
                     Response::HTTP_UNPROCESSABLE_ENTITY,
                     ['message' => 'An error occurred while processing the tile. Please contact support.']
@@ -64,6 +72,7 @@ class ApiController extends Controller
 
             if ($matchCount >= $game->matches_to_win) {
                 $this->gameSessionService->finalizeGame($game, true);
+                   Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
                 $body['message'] = 'You won a prize!';
 
                 return $this->response(Response::HTTP_OK, $body);
@@ -71,6 +80,7 @@ class ApiController extends Controller
 
             if (! $game->can_scratch_tiles) {
                 $this->gameSessionService->finalizeGame($game, false);
+                   Log::info('Player lost game', ['gameId' => $gameId, 'account' => $game->account]);
                 $body['message'] = 'No more tries left. Game has ended.';
             }
 
@@ -78,6 +88,19 @@ class ApiController extends Controller
         });
 
         return response()->json($result['body'], $result['status']);
+       } catch (\Throwable $e) {
+           Log::error('Flip request failed with exception', [
+               'gameId' => $gameId,
+               'tileIndex' => $tileIndex,
+               'error' => $e->getMessage(),
+               'trace' => $e->getTraceAsString()
+           ]);
+       
+           return response()->json(
+               ['message' => 'An error occurred. Please contact support.'],
+               Response::HTTP_INTERNAL_SERVER_ERROR
+           );
+       }
     }
 
     private function response(int $status, array $body): array

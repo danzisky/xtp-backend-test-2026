@@ -7,6 +7,7 @@ use App\Models\DailyPrizeCounter;
 use App\Models\Prize;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Illuminate\Support\Facades\Log;
 
 final class PrizeAvailabilityService
 {
@@ -31,6 +32,7 @@ final class PrizeAvailabilityService
         }
 
         DB::transaction(function () use ($prize, $campaign) {
+        try {
             $counterDate = $this->campaignDate($campaign);
 
             $counter = DailyPrizeCounter::query()
@@ -50,10 +52,26 @@ final class PrizeAvailabilityService
             }
 
             if ($counter->reserved_count >= (int) $counter->daily_limit) {
+                Log::warning('Prize daily limit reached', [
+                    'prizeId' => $prize->id,
+                    'dailyLimit' => $counter->daily_limit,
+                    'counterDate' => $counterDate,
+                ]);
                 throw new RuntimeException('Prize daily limit reached.');
             }
 
             $counter->increment('reserved_count');
+            Log::info('Prize reserved', [
+                'prizeId' => $prize->id,
+                'counterDate' => $counterDate,
+            ]);
+        } catch (RuntimeException $e) {
+            Log::error('Prize reservation failed', [
+                'prizeId' => $prize->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
         });
     }
 
@@ -62,6 +80,10 @@ final class PrizeAvailabilityService
             $counter = $prize->counterForDay(now($campaign->timezone));
             if ($counter) {
                 $counter->increment('awarded_count');
+                    Log::info('Prize marked as awarded', [
+                        'prizeId' => $prize->id,
+                        'awardedCount' => $counter->awarded_count,
+                    ]);
             }
         });
     }
@@ -71,6 +93,14 @@ final class PrizeAvailabilityService
             $counter = $prize->counterForDay(now($campaign->timezone));
             if ($counter && $counter->reserved_count > 0) {
                 $counter->decrement('reserved_count');
+                    Log::info('Prize reservation released', [
+                        'prizeId' => $prize->id,
+                        'reservedCount' => $counter->reserved_count,
+                    ]);
+                } else if ($counter === null) {
+                    Log::warning('Cannot release reservation: counter not found', [
+                        'prizeId' => $prize->id,
+                    ]);
             }
         });
     }
