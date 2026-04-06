@@ -1,108 +1,167 @@
 # Xtremepush Backend Test
 
-This test evaluates your Laravel development skills with a focus on problem-solving,
-code quality, and attention to detail.
+Straight-to-the-point documentation for running and understanding the project.
 
-## Installation
+## 1) Project Setup
 
-1. Clone this repository
-2. Run `composer install`
-3. Copy `.env.example` to `.env` and configure your database
-4. Run `php artisan key:generate`
-5. Run `php artisan migrate`
-6. Run `php artisan db:seed`
-7. Run `npm install && npm run build`
-8. Visit `/backstage` in your browser
+1. Clone the repository.
+2. Install PHP dependencies.
 
-Login credentials:
-- Email: `test@xtremepush.com`
-- Password: `test123`
-
----
-
-## The Task: Scratch Card Game
-
-The database seeder creates two test campaigns, 18 prize records, and 10,000 game records.
-
-Access the first test campaign at:
-
-```
-{your-app-url}/test-campaign-1?a=account&segment=low
+```bash
+composer install
 ```
 
-You will see a board of 25 squares (5x5 grid). The game works as follows:
+3. Install frontend dependencies and build assets.
 
-- A player clicks tiles on the board to reveal prizes
-- Each revealed tile corresponds to a prize from the back office
-- When a player collects **three matching tiles**, the game ends and they win that prize
-- The game should be properly connected to the database; the provided API endpoint is a simplified example using cache
-
-### Requirements
-
-1. **Game Creation**: When a player accesses the campaign link with `?a=account`,
-   create a new game or retrieve their unfinished game.
-
-2. **Tile Selection**: Prizes are selected based on their configured weight. Use:
-   ```
-   ->orderByRaw('-LOG(RAND()) / weight')
-   ```
-   Consider how to create the illusion of equal chance for prizes until the final match.
-
-3. **Prize Daily Limits**: Enforce daily volume limits for prizes.
-   If a prize has reached its daily cap, it cannot be won again that day.
-
-4. **Campaign Validity**: Display a message if the campaign has not started or has already ended.
-
-5. **Segment Filtering**: Players can only draw prizes matching their `segment`
-   query parameter (`low`, `med`, `high`).
-
-6. **Game Persistence**: The game state must survive page refreshes.
-   When a player returns, they should see their previously revealed tiles.
-
-7. **Prize Images**: Each prize has an associated tile image stored in the database.
-   Use these images when revealing tiles.
-
-### API Contract
-
-The frontend sends POST requests to the API path with:
-```json
-{ "gameId": 0, "tileIndex": 0 }
+```bash
+npm install
+npm run build
 ```
 
-Expected response:
-```json
-{ "tileImage": "/assets/tile.jpg" }
+4. Create environment file and configure database credentials.
+
+```bash
+copy .env.example .env
 ```
 
-When the game ends (3rd match), include a message:
-```json
-{ "tileImage": "/assets/tile.jpg", "message": "You won a prize!" }
+5. Generate application key.
+
+```bash
+php artisan key:generate
 ```
 
-The frontend configuration expects a JSON string:
-```json
-{
-    "apiPath": "/api/flip",
-    "gameId": "gameID",
-    "revealedTiles": [{ "index": 0, "image": "/assets/tile.jpg" }],
-    "message": "Campaign has ended"
-}
+6. Run database migrations and seeders.
+
+```bash
+php artisan migrate
+php artisan db:seed
 ```
 
----
+7. Create storage symlink for uploaded images.
 
-## Guidelines
+```bash
+php artisan storage:link
+```
 
-- Use new migrations for any database changes you need to make
-- You are encouraged to optimize database queries and structure
-- Focus on code clarity, security, and maintainability
-- Look for and fix any issues you find in the existing codebase
-- If you have questions, contact us via email
+8. Start the app.
 
-## Evaluation
+```bash
+php artisan serve
+```
 
-We evaluate based on:
-1. Code clarity and maintainability
-2. Adherence to Laravel best practices
-3. Problem-solving and attention to detail
-4. Correct and complete feature implementation
+9. Open Backstage.
+
+```text
+http://127.0.0.1:8000/backstage
+```
+
+Default login:
+- Email: test@xtremepush.com
+- Password: test123
+
+## 2) How To Run The Game
+
+Use a campaign slug URL with account and segment:
+
+```text
+http://127.0.0.1:8000/test-campaign-1?a=account&segment=low
+```
+
+Segment must be one of: low, med, high.
+
+## 3) Game Flow Logic
+
+Game flow is handled mainly by FrontendController, GameSessionService, and ApiController.
+
+1. Campaign page load
+- Validates campaign state (upcoming/ended/active).
+- Builds a game context from campaign + account + segment.
+- Reuses unfinished game if one exists; otherwise creates a new game.
+
+2. Game creation
+- Board planning decides winning or losing board.
+- For winning boards, a winnable prize is selected and reserved.
+- Game tiles are persisted with tile_image values from Prize image.
+
+3. Tile flip API (/api/flip)
+- Locks game row transactionally.
+- Resolves requested display tile, reveals it, returns tile image.
+- Checks revealed-match count against matches_to_win.
+- Finalizes game as won/lost and returns final message when needed.
+
+4. Persistence
+- Revealed tiles are stored in DB, so state survives refreshes.
+
+## 4) Prize Selection Logic
+
+Prize selection is segment-aware and availability-aware.
+
+1. Eligible prizes
+- Filtered by campaign, segment, and start/end time windows.
+
+2. Winnable prizes
+- Filtered by segment and daily_limit capacity.
+- Uses daily_prize_counters to ensure reserved_count < daily_limit.
+
+3. Weighted winner pick
+- Winner selection uses weighted SQL strategy:
+
+```php
+->orderByRaw('-LOG(RAND()) / weight')
+```
+
+4. Board planning rules
+- max appearance per prize = matches_to_win - 1 for filler distribution.
+- Board must support max_tries and prize constraints.
+- If a losing board is impossible, planner attempts a winning board.
+
+## 5) Campaign Modification Checks Added
+
+Campaign create/update requests include cross-field validation for board feasibility.
+
+1. Hard board-size check
+- max_tries cannot exceed configured board capacity.
+- Capacity is board_size x board_size from config/scratchgame.php.
+
+2. Segment bottleneck check (Update)
+- Counts prizes per segment (low/med/high).
+- Uses the segment with the lowest count as worst-case validation.
+- Blocks update when minimum required prizes are not met for that segment.
+- Error message tells exactly which segment is blocking the change and why.
+
+3. Minimum required prizes formula
+
+For a configuration to be feasible:
+
+minRequiredPrizes = ceil((ceil(sqrt(max_tries))^2) / (matches_to_win - 1))
+
+## 6) Major Changes In This Project
+
+1. Service-oriented game architecture
+- Game session, board planning, prize selection, and prize availability are separated into dedicated services.
+
+2. Robust game finalization
+- Winner/loser finalization updates game status and prize counters consistently in transactions.
+
+3. Segment-aware campaign validation
+- Campaign updates now validate against the least-populated segment to prevent impossible game settings.
+
+4. Prize image upload implementation
+- Backstage prize forms support file upload.
+- Uploaded files are stored on the public disk and saved as image URL/path.
+- Requires php artisan storage:link.
+
+5. Frontend config improvements
+- Frontend receives revealed tiles and game messages from server-built config.
+
+## 7) Quick Troubleshooting
+
+1. Images not visible
+- Run php artisan storage:link.
+- Confirm files exist under storage/app/public/prizes.
+
+2. Game not loading
+- Check campaign date range and URL query params (a and segment).
+
+3. Asset issues
+- Rebuild frontend assets with npm run build.
