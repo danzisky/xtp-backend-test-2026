@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,7 +33,29 @@ class Game extends Model
         $query = self::query();
         $campaign = Campaign::find(session('activeCampaign'));
 
-        // When filtering by dates, keep in mind `finished_at` should be stored in Campaign timezone
+        if ($campaign) {
+            $query->where('games.campaign_id', $campaign->id);
+        }
+
+        if ($account) {
+            $query->where('games.account', 'like', '%'.$account.'%');
+        }
+
+        if ($prizeId) {
+            $query->where('games.prize_id', $prizeId);
+        }
+
+        // Date inputs represent days in the campaign's timezone.
+        // Convert to UTC boundaries before comparing the stored UTC timestamp.
+        $tz = $campaign?->timezone ?? 'UTC';
+
+        if ($fromDate) {
+            $query->where('finished_at', '>=', Carbon::parse($fromDate, $tz)->startOfDay()->utc());
+        }
+
+        if ($tillDate) {
+            $query->where('finished_at', '<=', Carbon::parse($tillDate, $tz)->endOfDay()->utc());
+        }
 
         return $query;
     }
