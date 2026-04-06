@@ -16,6 +16,7 @@ class UpdateRequest extends FormRequest
         return [
             'name' => 'required|max:255',
             'description' => 'sometimes',
+            'image_file' => 'nullable|image|max:2048',
             'weight' => 'required|numeric|between:0.01,99.99',
             'starts_at' => 'required|date_format:d-m-Y H:i:s',
             'ends_at' => 'required|date_format:d-m-Y H:i:s',

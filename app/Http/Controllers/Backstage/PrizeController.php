@@ -7,8 +7,10 @@ use App\Http\Requests\Backstage\Prizes\StoreRequest;
 use App\Http\Requests\Backstage\Prizes\UpdateRequest;
 use App\Models\Prize;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class PrizeController extends Controller
@@ -28,6 +30,7 @@ class PrizeController extends Controller
     public function store(StoreRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $data['image'] = $this->persistImageInput($request);
         $data['campaign_id'] = session('activeCampaign');
 
         try {
@@ -67,6 +70,7 @@ class PrizeController extends Controller
     public function update(UpdateRequest $request, Prize $prize): RedirectResponse
     {
         $data = $request->validated();
+        $data['image'] = $this->persistImageInput($request, $prize->image);
         $data['campaign_id'] = session('activeCampaign');
 
         try {
@@ -125,5 +129,25 @@ class PrizeController extends Controller
         session()->flash('success', 'The prize has been deleted!');
 
         return redirect()->route('backstage.prizes.index');
+    }
+
+    private function persistImageInput(StoreRequest|UpdateRequest $request, ?string $existingImage = null): ?string
+    {
+        if ($request->hasFile('image_file')) {
+            return $this->storeUploadedImage($request->file('image_file'));
+        }
+
+        return $existingImage;
+    }
+
+    private function storeUploadedImage(?UploadedFile $file): ?string
+    {
+        if (! $file) {
+            return null;
+        }
+
+        $path = $file->store('prizes', 'public');
+
+        return Storage::disk('public')->url($path);
     }
 }
