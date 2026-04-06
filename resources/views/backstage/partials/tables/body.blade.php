@@ -16,6 +16,9 @@
                                     @php($modelname = $column['model'])
                                     @php($param = $column['param'])
                                     @modelname($row, $modelname, $param)
+                            @elseif( isset($column['nested']) )
+                                @php($nested = $column['nested'])
+                                {{ data_get($row, $nested) }}
                             @else
                                 {{ $row->{$column['title']} ?? '' }}
                             @endif

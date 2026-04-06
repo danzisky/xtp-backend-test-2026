@@ -14,6 +14,7 @@ class GameTile extends Model
     protected $fillable = [
         'game_id',
         'tile_index',
+        'display_index',
         'prize_id',
         'tile_image',
         'revealed_at',
@@ -38,5 +39,15 @@ class GameTile extends Model
         return Attribute::make(
             get: fn () => $this->revealed_at !== null,
         );
+    }
+
+    public function scopeRevealed($query)
+    {
+        return $query->whereNotNull('revealed_at');
+    }
+
+    public function scopeUnrevealed($query)
+    {
+        return $query->whereNull('revealed_at');
     }
 }

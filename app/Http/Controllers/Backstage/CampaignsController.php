@@ -18,8 +18,11 @@ class CampaignsController extends Controller
 
     public function create(): View
     {
+        $campaign = new Campaign;
+        $campaign->matches_to_win = config('scratchgame.matchestowin', 3);
+        $campaign->max_tries = config('scratchgame.maxtries', 10);
         return view('backstage.campaigns.create', [
-            'campaign' => new Campaign,
+            'campaign' => $campaign,
         ]);
     }
 

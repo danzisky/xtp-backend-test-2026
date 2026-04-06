@@ -3,13 +3,29 @@
 @include('backstage.partials.forms.text', [
     'field' => 'name',
     'label' => 'Name',
-    'value' => old('name') ?? $campaign->name,
+    'value' => old('name') ?? $campaign?->name,
+])
+
+@include('backstage.partials.forms.number', [
+    'field' => 'matches_to_win',
+    'label' => 'No. of matches to win',
+    'value' => old('matches_to_win') ?? $campaign?->matches_to_win,
+    'min' => 2,
+    'max' => 5,
+])
+
+@include('backstage.partials.forms.number', [
+    'field' => 'max_tries',
+    'label' => 'Max tiles scratchable',
+    'value' => old('max_tries') ?? $campaign?->max_tries,
+    'min' => 1,
+    'max' => 25,
 ])
 
 @include('backstage.partials.forms.select', [
     'field' => 'timezone',
     'label' => 'Timezone',
-    'value' => old('timezone') ?? $campaign->timezone,
+    'value' => old('timezone') ?? $campaign?->timezone,
     'options' => $campaign->getAvailableTimezones(),
 ])
 

@@ -20,6 +20,16 @@ class CampaignTable extends TableComponent
                 'sort' => true,
             ],
             [
+                'title' => 'max tries',
+                'attribute' => 'max_tries',
+                'sort' => true,
+            ],
+            [
+                'title' => 'matches to win',
+                'attribute' => 'matches_to_win',
+                'sort' => true,
+             ],
+            [
                 'title' => 'starts_at',
                 'sort' => true,
             ],

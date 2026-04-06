@@ -14,7 +14,7 @@ class Campaign extends Model
     use HasSlug;
 
     protected $fillable = [
-        'timezone', 'name', 'slug', 'starts_at', 'ends_at',
+        'timezone', 'name', 'slug', 'starts_at', 'ends_at', 'matches_to_win', 'max_tries'
     ];
 
     protected $appends = [

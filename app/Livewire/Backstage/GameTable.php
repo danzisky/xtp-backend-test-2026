@@ -29,8 +29,25 @@ class GameTable extends TableComponent
             ],
 
             [
-                'title' => 'prize_id', // please update this, that it would show prize name instead
-                'attribute' => 'prize_id',
+                'title' => 'prize name', // updated to show prize name instead
+                'nested' => 'prize.name',
+                'sort' => false,
+            ],
+
+            [
+                'title' => 'status',
+                'sort' => true,
+            ],
+
+            [
+                'title' => 'max tries',
+                'attribute' => 'max_tries',
+                'sort' => true,
+            ],
+
+            [
+                'title' => 'matches to win',
+                'attribute' => 'matches_to_win',
                 'sort' => true,
             ],
 
@@ -45,8 +62,12 @@ class GameTable extends TableComponent
             'columns' => $columns,
             'resource' => 'games',
             'rows' => Game::filter()
-                ->join('prizes', 'prizes.id', '=', 'games.prize_id')
-                ->where('prizes.campaign_id', session('activeCampaign'))
+                ->leftJoin('prizes', 'prizes.id', '=', 'games.prize_id')
+                ->where(function ($query) {
+                    $query
+                        ->where('games.campaign_id', session('activeCampaign'))
+                        ->orWhereNull('games.prize_id');
+                })
                 ->orderBy($this->sortField, $this->sortDesc ? 'DESC' : 'ASC')
                 ->paginate($this->perPage),
         ]);

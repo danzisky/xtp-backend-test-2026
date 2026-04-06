@@ -3,6 +3,7 @@
 namespace App\Services\Game;
 
 use App\Data\Game\GameContextData;
+use App\Enums\GameStatus;
 use App\Models\Game;
 use App\Models\Prize;
 use Illuminate\Support\Facades\DB;
@@ -43,12 +44,14 @@ final class GameSessionService
                 $winningPrize = Prize::query()->findOrFail($boardPlan->winningPrizeId);
                 $this->prizeAvailability->reservePrize($winningPrize, $context->campaign);
             }
-    
+
             $game = Game::query()->create([
                 'campaign_id' => $context->campaign->id,
                 'account' => $context->account,
                 'segment' => $context->segment,
                 'prize_id' => $winningPrize?->id,
+                'matches_to_win' => $context->campaign->matches_to_win,
+                'max_tries' => $context->campaign->max_tries,
             ]);
 
             $prizeImages = Prize::query()
@@ -70,27 +73,33 @@ final class GameSessionService
         });
     }
 
-    public function finalizeGame(Game $game): void {
+    public function finalizeGame(Game $game, $won = false): void {
         if ($game->finished_at !== null) {
             return;
         }
 
-        $game->finished_at = now();
-        $game->save();
-
         if ($game->prize_id !== null) {
             $prize = Prize::query()->find($game->prize_id);
-            if ($prize) {
+            if ($prize && $won) { // user won the game, mark the prize as awarded
                 $this->prizeAvailability->markAwarded($prize, $game->campaign);
+                $game->status = GameStatus::WON->value;
+            } else if ($prize && ! $won) { // game ended without winning, release the reserved prize
+                $this->prizeAvailability->releaseReservation($prize, $game->campaign);
+                $game->status = GameStatus::LOST->value;
             }
+        } else {
+            $game->status = $won ? GameStatus::WON->value : GameStatus::LOST->value;
         }
+
+        $game->finished_at = now();
+        $game->save();
     }
 
     public function buildFrontendConfig(Game $game, ?string $message = null): array {
         $revealedTiles = $game->tiles
             ->whereNotNull('revealed_at')
             ->map(fn ($tile) => [
-                'index' => $tile->tile_index,
+                'index' => $tile?->display_index ?? $tile->tile_index,
                 'image' => $tile->tile_image,
             ])
             ->values()

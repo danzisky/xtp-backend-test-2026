@@ -31,6 +31,8 @@ class Prize extends Model
         ];
     }
 
+    protected $with = ['campaign'];
+
     public static function search($query)
     {
         return empty($query) ? static::query()

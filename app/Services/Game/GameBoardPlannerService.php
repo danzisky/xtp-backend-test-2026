@@ -10,75 +10,85 @@ use Illuminate\Support\Collection;
 
 final class GameBoardPlannerService
 {
-    private const BOARD_SIZE = 5;
-    private const WINNING_COUNT = 3;
-
     public function __construct(
         private PrizeSelectorService $prizeSelector,
         private PrizeAvailabilityService $prizeAvailability
     ) {}
 
     public function plan(GameContextData $context): BoardPlanData {
-        $eligiblePrizes = $this->prizeSelector->getEligiblePrizes($context->campaign, $context->segment);
+        $campaign = $context->campaign;
+        $segment = $context->segment;
+        $matchesToWin = $campaign->matches_to_win;
+        $maxAppearancePerPrize = $matchesToWin - 1;
+        $maxTries = $campaign->max_tries;
+
+        $eligiblePrizes = $this->prizeSelector->getEligiblePrizes($campaign, $segment);
+
+        // Calculate board size required based on eligible prizes and max appearances to ensure we can fill the board without running out of prizes.
+        $boardSize = min(config('scratchgame.boardsize', 5), (int) floor(sqrt($eligiblePrizes->count() * $maxAppearancePerPrize)));
+
+        if (($boardSize * $boardSize) < $maxTries) {
+            throw new DomainException('Board size is too small to accommodate all tries with the given prize constraints.');
+        }
 
         if ($eligiblePrizes->isEmpty()) {
             throw new DomainException('No eligible prizes found for this campaign and segment.');
         }
 
-        $canBuildLosingBoard = ($eligiblePrizes->count() * 2) >= (self::BOARD_SIZE * self::BOARD_SIZE);
+        $canBuildLosingBoard = ($eligiblePrizes->count() * $maxAppearancePerPrize) >= ($boardSize * $boardSize);
 
         $isWinning = random_int(0, 1) === 1;
 
         $winningPrize = $isWinning
-            ? $this->prizeSelector->selectWeightedPrize($context->campaign, $context->segment)
+            ? $this->prizeSelector->selectWeightedPrize($campaign, $segment)
             : null;
 
         if (! $winningPrize) {
             $isWinning = false;
         }
 
-        if ($isWinning && ! $this->prizeAvailability->isPrizeAvailable($winningPrize, $context->campaign)) {
+        if ($isWinning && ! $this->prizeAvailability->isPrizeAvailable($winningPrize, $campaign)) {
             $isWinning = false;
         }
 
         if (! $isWinning && ! $canBuildLosingBoard) {
             $isWinning = true;
-            $winningPrize = $this->prizeSelector->selectWeightedPrize($context->campaign, $context->segment);
+            $winningPrize = $this->prizeSelector->selectWeightedPrize($campaign, $segment);
 
-            if (! $winningPrize || ! $this->prizeAvailability->isPrizeAvailable($winningPrize, $context->campaign)) {
+            if (! $winningPrize || ! $this->prizeAvailability->isPrizeAvailable($winningPrize, $campaign)) {
                 throw new DomainException('Unable to plan board with current prize constraints.');
             }
         }
 
         return $isWinning
-            ? $this->buildWinningBoard($eligiblePrizes, $winningPrize)
-            : $this->buildLosingBoard($eligiblePrizes);
+            ? $this->buildWinningBoard($eligiblePrizes, $winningPrize, $boardSize, $matchesToWin)
+            : $this->buildLosingBoard($eligiblePrizes, $boardSize, $matchesToWin);
     }
 
-    private function buildWinningBoard(Collection $eligiblePrizes, Prize $winningPrize): BoardPlanData
+    private function buildWinningBoard(Collection $eligiblePrizes, Prize $winningPrize, int $boardSize, int $matchesToWin): BoardPlanData
     {
         $fillerPrizeIds = $eligiblePrizes
-            ->where('id', '!=', $winningPrize->id)
+        ->where('id', '!=', $winningPrize->id)
             ->pluck('id')
             ->values();
-
+            
         if ($fillerPrizeIds->isEmpty()) {
             throw new DomainException('Unable to build winning board with no filler prizes.');
-        }
+            }
 
-        if (($fillerPrizeIds->count() * 2) < ((self::BOARD_SIZE * self::BOARD_SIZE) - self::WINNING_COUNT)) {
+        $maxFillerAppearances = $matchesToWin - 1;
+        if (($fillerPrizeIds->count() * $maxFillerAppearances) < (($boardSize * $boardSize) - $matchesToWin)) {
             throw new DomainException('Insufficient filler prizes to build a valid winning board.');
         }
 
         $board = $this->sampleNTiles(
             $fillerPrizeIds,
-            (self::BOARD_SIZE * self::BOARD_SIZE) - self::WINNING_COUNT,
-            2,
-            false
+            ($boardSize * $boardSize) - $matchesToWin,
+            $maxFillerAppearances,
         );
 
         $board = $board
-            ->concat(collect(array_fill(0, self::WINNING_COUNT, $winningPrize->id)))
+            ->concat(collect(array_fill(0, $matchesToWin, $winningPrize->id)))
             ->shuffle()
             ->values();
 
@@ -89,10 +99,11 @@ final class GameBoardPlannerService
         );
     }
 
-    public function buildLosingBoard(Collection $eligiblePrizes): BoardPlanData
+    public function buildLosingBoard(Collection $eligiblePrizes, int $boardSize, int $matchesToWin): BoardPlanData
     {
         $prizeIds = $eligiblePrizes->pluck('id')->values();
-        $board = $this->sampleNTiles($prizeIds, self::BOARD_SIZE * self::BOARD_SIZE, 2, false);
+        $maxFillerAppearances = $matchesToWin - 1;
+        $board = $this->sampleNTiles($prizeIds, $boardSize * $boardSize, $maxFillerAppearances);
 
         return new BoardPlanData(
             isWinner: false,
@@ -106,35 +117,20 @@ final class GameBoardPlannerService
      *
      * @param Collection $eligiblePrizes
      * @param integer $n
+     * @param integer $maxPerPrize Maximum number of times a single prize can appear in the result before allowing overflow.
      * @return Collection
      */
     private function sampleNTiles(
         Collection $eligiblePrizes,
         int $n,
         int $maxPerPrize,
-        bool $allowOverflow
     ): Collection {
-        $counts = [];
-        $result = [];
+        $sample = $eligiblePrizes->unique();
 
-        for ($i = 0; $i < $n; $i++) {
-            $available = $eligiblePrizes
-                ->filter(fn (int $prizeId) => ($counts[$prizeId] ?? 0) < $maxPerPrize)
-                ->values();
-
-            if ($available->isEmpty()) {
-                if (! $allowOverflow) {
-                    throw new DomainException('Insufficient prize variety to build board safely.');
-                }
-
-                $available = $eligiblePrizes;
-            }
-
-            $pickedPrizeId = (int) $available->random();
-            $result[] = $pickedPrizeId;
-            $counts[$pickedPrizeId] = ($counts[$pickedPrizeId] ?? 0) + 1;
+        for ($i = 0; $i < $maxPerPrize; $i++) { // Allow up to $maxPerPrize duplicates of each prize
+            $sample = $sample->merge($eligiblePrizes)->shuffle();
         }
 
-        return collect($result);
+        return $sample->shuffle()->take($n)->values();
     }
 }

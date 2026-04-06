@@ -12,7 +12,7 @@ class Game extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['campaign_id', 'prize_id', 'account', 'segment', 'finished_at'];
+    protected $fillable = ['campaign_id', 'prize_id', 'status', 'account', 'segment', 'finished_at', 'matches_to_win', 'max_tries'];
 
     protected function casts(): array
     {
@@ -24,6 +24,7 @@ class Game extends Model
     protected $appends = [
         'is_finished',
         'is_valid',
+        'can_sratch_tiles',
     ];
 
     public static function filter(?string $account = null, ?int $prizeId = null, ?string $fromDate = null, ?string $tillDate = null)
@@ -49,6 +50,23 @@ class Game extends Model
     public function tiles(): HasMany
     {
         return $this->hasMany(GameTile::class);
+    }
+
+    public function unscratchedTiles(): HasMany
+    {
+        return $this->tiles()->unrevealed();
+    }
+
+    public function scratchedTiles(): HasMany
+    {
+        return $this->tiles()->revealed();
+    }
+
+    public function canScratchTiles(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->scratchedTiles()->count() < $this->max_tries,
+        );
     }
 
     public function isFinished(): Attribute

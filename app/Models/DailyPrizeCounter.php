@@ -12,7 +12,6 @@ class DailyPrizeCounter extends Model
     use HasFactory;
 
     protected $fillable = [
-        // 'campaign_id',
         'prize_id',
         'counter_date',
         'reserved_count',
@@ -35,7 +34,6 @@ class DailyPrizeCounter extends Model
     protected function isAwardable(): Attribute
     {
         return Attribute::make(
-            // get: fn () => $this->reserved_count < $this->prize->daily_limit,
              get: fn () => $this->reserved_count < $this->daily_limit,
         );
     }
