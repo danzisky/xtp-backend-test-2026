@@ -8,6 +8,9 @@ use App\Models\Prize;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
+/**
+ * Service responsible for selecting eligible and winnable prizes for game sessions based on campaign context and prize constraints.
+ */
 final class PrizeSelectorService
 {
     /**

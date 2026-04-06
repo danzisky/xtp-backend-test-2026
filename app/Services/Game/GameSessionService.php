@@ -9,6 +9,9 @@ use App\Models\Prize;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Service responsible for managing game sessions, including creation, retrieval, and finalization of games based on the provided context.
+ */
 final class GameSessionService
 {
     public function __construct(
@@ -17,6 +20,13 @@ final class GameSessionService
     ) {
     }
 
+    /**
+     * Get an open game session for the given context or create a new one if none exists. This ensures that a player can only have one active game session per campaign and segment.
+     *
+     * @param GameContextData $context
+     * @return Game
+     * @throws \Throwable if game creation fails due to prize availability or board planning issues.
+     */
     public function getOrCreateOpenGame(GameContextData $context): Game
     {
         $game = $this->findOpenGame($context);
@@ -35,6 +45,12 @@ final class GameSessionService
         return $this->createGame($context);
     }
 
+    /**
+     * Find an open game session for the given context. An open game is defined as a game that matches the campaign, account, and segment, and has not been finished yet.
+     *
+     * @param GameContextData $context
+     * @return Game|null
+     */
     public function findOpenGame(GameContextData $context): ?Game
     {
         return Game::query()
@@ -46,6 +62,13 @@ final class GameSessionService
             ->first();
     }
 
+    /**
+     * Create a new game session based on the provided context. This includes planning the game board and reserving any prizes if necessary.
+     *
+     * @param GameContextData $context
+     * @return Game
+     * @throws \Throwable if game creation fails due to prize availability or board planning issues.
+     */
     public function createGame(GameContextData $context): Game
     {
         try {
@@ -108,6 +131,14 @@ final class GameSessionService
         }
     }
 
+    /**
+     * Finalize the game by setting the finished_at timestamp and updating the status.
+     * If the game is won and has a prize, mark the prize as awarded. If lost, release any reserved prize.
+     *
+     * @param Game $game
+     * @param bool $won
+     * @return void
+     */
     public function finalizeGame(Game $game, bool $won = false): void
     {
         if ($game->finished_at !== null) {
@@ -158,6 +189,13 @@ final class GameSessionService
         }
     }
 
+    /**
+     * Build the frontend configuration for the given game, including revealed tiles and any messages.
+     *
+     * @param Game $game
+     * @param string|null $message
+     * @return array
+     */
     public function buildFrontendConfig(Game $game, ?string $message = null): array
     {
         $revealedTiles = $game->tiles

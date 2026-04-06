@@ -8,6 +8,9 @@ use App\Models\Prize;
 use DomainException;
 use Illuminate\Support\Collection;
 
+/**
+ * Service responsible for planning the game board for new game sessions based on campaign and player context, ensuring compliance with prize constraints and game rules.
+ */
 final class GameBoardPlannerService
 {
     public function __construct(
@@ -15,7 +18,15 @@ final class GameBoardPlannerService
         private PrizeAvailabilityService $prizeAvailability
     ) {}
 
-    public function plan(GameContextData $context): BoardPlanData {
+    /**
+     * Plan the game board for a new game session based on the campaign and player context.
+     *
+     * @param GameContextData $context
+     * @return BoardPlanData
+     * @throws DomainException if a valid board cannot be planned with the current prize constraints.
+     */
+    public function plan(GameContextData $context): BoardPlanData
+    {
         $campaign = $context->campaign;
         $segment = $context->segment;
         $matchesToWin = $campaign->matches_to_win;
@@ -65,16 +76,26 @@ final class GameBoardPlannerService
             : $this->buildLosingBoard($eligiblePrizes, $boardSize, $matchesToWin);
     }
 
+    /**
+     * Build a winning board plan with the specified winning prize and eligible prizes for fillers.
+     *
+     * @param Collection $eligiblePrizes
+     * @param Prize $winningPrize
+     * @param int $boardSize
+     * @param int $matchesToWin
+     * @return BoardPlanData
+     * @throws DomainException if a valid winning board cannot be constructed with the given prizes and constraints.
+     */
     private function buildWinningBoard(Collection $eligiblePrizes, Prize $winningPrize, int $boardSize, int $matchesToWin): BoardPlanData
     {
         $fillerPrizeIds = $eligiblePrizes
-        ->where('id', '!=', $winningPrize->id)
+            ->where('id', '!=', $winningPrize->id)
             ->pluck('id')
             ->values();
-            
+
         if ($fillerPrizeIds->isEmpty()) {
             throw new DomainException('Unable to build winning board with no filler prizes.');
-            }
+        }
 
         $maxFillerAppearances = $matchesToWin - 1;
         if (($fillerPrizeIds->count() * $maxFillerAppearances) < (($boardSize * $boardSize) - $matchesToWin)) {
@@ -99,6 +120,14 @@ final class GameBoardPlannerService
         );
     }
 
+    /**
+     * Build a losing board plan with the given eligible prizes.
+     *
+     * @param Collection $eligiblePrizes
+     * @param int $boardSize
+     * @param int $matchesToWin
+     * @return BoardPlanData
+     */
     public function buildLosingBoard(Collection $eligiblePrizes, int $boardSize, int $matchesToWin): BoardPlanData
     {
         $prizeIds = $eligiblePrizes->pluck('id')->values();

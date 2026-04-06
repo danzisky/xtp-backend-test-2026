@@ -24,6 +24,10 @@ class GameTile extends Model
         'revealed_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'is_revealed',
+    ];
+
     public function prize(): BelongsTo
     {
         return $this->belongsTo(Prize::class);

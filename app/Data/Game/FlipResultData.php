@@ -9,6 +9,11 @@ final class FlipResultData
         public readonly ?string $message = null,
     )   {}
 
+    /**
+     * Convert the flip result data to an array format suitable for JSON serialization, filtering out any null values.
+     *
+     * @return array
+     */
     public function toArray(): array
     {
         return array_filter([

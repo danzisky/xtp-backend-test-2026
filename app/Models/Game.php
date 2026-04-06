@@ -38,7 +38,7 @@ class Game extends Model
         }
 
         if ($account) {
-            $query->where('games.account', 'like', '%'.$account.'%');
+            $query->where('games.account', 'like', '%' . $account . '%');
         }
 
         if ($prizeId) {
@@ -88,21 +88,21 @@ class Game extends Model
     public function canScratchTiles(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->scratchedTiles()->count() < $this->max_tries,
+            get: fn() => $this->scratchedTiles()->count() < $this->max_tries,
         );
     }
 
     public function isFinished(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->finished_at !== null,
+            get: fn() => $this->finished_at !== null,
         );
     }
 
     public function isValid(): Attribute
     {
         return Attribute::make(
-            get: fn () => !$this->finished_at && $this?->campaign?->is_active,
+            get: fn() => !$this->finished_at && $this?->campaign?->is_active,
         );
     }
 }

@@ -23,84 +23,84 @@ class ApiController extends Controller
         $gameId = $request->gameId();
         $tileIndex = $request->tileIndex();
 
-       Log::info('Flip request received', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
-   
-       try {
-        $result = DB::transaction(function () use ($gameId, $tileIndex): array {
-            $game = Game::query()
-                ->with('campaign')
-                ->lockForUpdate()
-                ->find($gameId);
+        Log::info('Flip request received', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
 
-            if (! $game) {
-                   Log::warning('Game not found', ['gameId' => $gameId]);
-                   return $this->response(Response::HTTP_NOT_FOUND, ['message' => 'Game not found.']);
-            }
+        try {
+            $result = DB::transaction(function () use ($gameId, $tileIndex): array {
+                $game = Game::query()
+                    ->with('campaign')
+                    ->lockForUpdate()
+                    ->find($gameId);
 
-            if ($game->is_finished) {
-                   Log::info('Game already finished', ['gameId' => $gameId]);
-                return $this->response(Response::HTTP_OK, ['message' => 'Game has already finished.']);
-            }
+                if (! $game) {
+                    Log::warning('Game not found', ['gameId' => $gameId]);
+                    return $this->response(Response::HTTP_NOT_FOUND, ['message' => 'Game not found.']);
+                }
 
-            if (! $game->is_valid) {
-                $message = $game->campaign?->is_active
-                    ? 'Game is not valid. Please contact support.'
-                    : 'Game is not valid. Campaign is not active.';
+                if ($game->is_finished) {
+                    Log::info('Game already finished', ['gameId' => $gameId]);
+                    return $this->response(Response::HTTP_OK, ['message' => 'Game has already finished.']);
+                }
 
-                   Log::warning('Invalid game detected', ['gameId' => $gameId, 'campaignActive' => $game->campaign?->is_active]);
-                return $this->response(Response::HTTP_UNPROCESSABLE_ENTITY, ['message' => $message]);
-            }
+                if (! $game->is_valid) {
+                    $message = $game->campaign?->is_active
+                        ? 'Game is not valid. Please contact support.'
+                        : 'Game is not valid. Campaign is not active.';
 
-            $tile = $this->resolveTile($game, $tileIndex);
+                    Log::warning('Invalid game detected', ['gameId' => $gameId, 'campaignActive' => $game->campaign?->is_active]);
+                    return $this->response(Response::HTTP_UNPROCESSABLE_ENTITY, ['message' => $message]);
+                }
 
-            if (! $tile) {
-                   Log::error('Failed to resolve tile', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
-                return $this->response(
-                    Response::HTTP_UNPROCESSABLE_ENTITY,
-                    ['message' => 'An error occurred while processing the tile. Please contact support.']
-                );
-            }
+                $tile = $this->resolveTile($game, $tileIndex);
 
-            $this->revealTileIfNeeded($tile, $tileIndex);
+                if (! $tile) {
+                    Log::error('Failed to resolve tile', ['gameId' => $gameId, 'tileIndex' => $tileIndex]);
+                    return $this->response(
+                        Response::HTTP_UNPROCESSABLE_ENTITY,
+                        ['message' => 'An error occurred while processing the tile. Please contact support.']
+                    );
+                }
 
-            $matchCount = $game->tiles()
-                ->where('prize_id', $tile->prize_id)
-                ->revealed()
-                ->count();
+                $this->revealTileIfNeeded($tile, $tileIndex);
 
-            $body = ['tileImage' => $tile->tile_image];
+                $matchCount = $game->tiles()
+                    ->where('prize_id', $tile->prize_id)
+                    ->revealed()
+                    ->count();
 
-            if ($matchCount >= $game->matches_to_win) {
-                $this->gameSessionService->finalizeGame($game, true);
-                   Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
-                $body['message'] = 'You won a prize!';
+                $body = ['tileImage' => $tile->tile_image];
+
+                if ($matchCount >= $game->matches_to_win) {
+                    $this->gameSessionService->finalizeGame($game, true);
+                    Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
+                    $body['message'] = 'You won a prize!';
+
+                    return $this->response(Response::HTTP_OK, $body);
+                }
+
+                if (! $game->can_scratch_tiles) {
+                    $this->gameSessionService->finalizeGame($game, false);
+                    Log::info('Player lost game', ['gameId' => $gameId, 'account' => $game->account]);
+                    $body['message'] = 'No more tries left. Game has ended.';
+                }
 
                 return $this->response(Response::HTTP_OK, $body);
-            }
+            });
 
-            if (! $game->can_scratch_tiles) {
-                $this->gameSessionService->finalizeGame($game, false);
-                   Log::info('Player lost game', ['gameId' => $gameId, 'account' => $game->account]);
-                $body['message'] = 'No more tries left. Game has ended.';
-            }
+            return response()->json($result['body'], $result['status']);
+        } catch (\Throwable $e) {
+            Log::error('Flip request failed with exception', [
+                'gameId' => $gameId,
+                'tileIndex' => $tileIndex,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-            return $this->response(Response::HTTP_OK, $body);
-        });
-
-        return response()->json($result['body'], $result['status']);
-       } catch (\Throwable $e) {
-           Log::error('Flip request failed with exception', [
-               'gameId' => $gameId,
-               'tileIndex' => $tileIndex,
-               'error' => $e->getMessage(),
-               'trace' => $e->getTraceAsString()
-           ]);
-       
-           return response()->json(
-               ['message' => 'An error occurred. Please contact support.'],
-               Response::HTTP_INTERNAL_SERVER_ERROR
-           );
-       }
+            return response()->json(
+                ['message' => 'An error occurred. Please contact support.'],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     private function response(int $status, array $body): array
