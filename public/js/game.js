@@ -502,7 +502,16 @@ function request(method, url, data) {
     return new Promise((resolve, reject) => {
         const request = new XMLHttpRequest();
         request.responseType = "json";
-        request.onload = _ => (request.status >= 200 && request.status < 300) ? resolve(request.response) : reject(new Error(request.statusText));
+        request.onload = _ => {
+            if (request.status >= 200 && request.status < 300) {
+                resolve(request.response);
+            } else {
+                const error = new Error(request.statusText);
+                error.response = request.response;
+                error.status = request.status;
+                reject(error);
+            }
+        };
         request.onerror = _ => reject(new Error(request.statusText));
         request.open(method, url);
         request.setRequestHeader("Content-Type", "application/json");
@@ -558,14 +567,23 @@ class MainComponent extends Component {
                 return;
             }
             this._interactive = false;
-            const response = yield request("POST", this._config.apiPath, { gameId: this._config.gameId, tileIndex: index });
-            this._tiles[index].setImage(response.tileImage);
-            if (response.message) {
-                this.refs.popup.setMessage(response.message);
-                this.refs.popup.show(true);
+            try {
+                const response = yield request("POST", this._config.apiPath, { gameId: this._config.gameId, tileIndex: index });
+                this._tiles[index].setImage(response.tileImage);
+                if (response.message) {
+                    this.refs.popup.setMessage(response.message);
+                    this.refs.popup.show(true);
+                }
+                else {
+                    this._interactive = true;
+                }
             }
-            else {
-                this._interactive = true;
+            catch (e) {
+                console.error(e);
+                const errorMessage = e.response?.message || e.message || "An error occurred";
+                // alert(errorMessage);
+                this.refs.popup.setMessage(errorMessage);
+                this.refs.popup.show(true);
             }
         });
     }

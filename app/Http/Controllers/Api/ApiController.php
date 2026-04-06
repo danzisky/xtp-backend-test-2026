@@ -3,31 +3,106 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Cache;
+use App\Http\Requests\Api\FlipRequest;
+use App\Models\Game;
+use App\Services\Game\GameBoardPlannerService;
+use App\Services\Game\GameSessionService;
+use App\Services\Game\PrizeAvailabilityService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class ApiController extends Controller
 {
-    public function flip()
+    public function __construct(
+        private GameSessionService $gameSessionService,
+        private GameBoardPlannerService $gameBoardPlannerService
+    ) {}
+
+    public function flip(FlipRequest $request): JsonResponse
     {
-        /**
-         * This is a simplified example to demonstrate interaction with the provided frontend (FE).
-         * The game objective is to collect three matching tiles to win a prize. Once three matching tiles are collected:
-         *   - The game ends.
-         *   - The prize is awarded, and its daily volume limit (defined in the back office) must be updated.
-         *
-         * Requirements:
-         * - Use the database layer to store and manage all game-related data, including game state and prize counts.
-         * - Cache is used here only for demonstration purposes and should be replaced with proper database storage.
-         */
-        $currentMove = (Cache::get(request('gameId')) ?? 0) + 1;
-        Cache::put(request('gameId'), $currentMove);
+        $gameId = $request->gameId();
+        $tileIndex = $request->tileIndex();
 
-        if ($currentMove >= 10) {
-            Cache::forget(request('gameId'));
-        }
+        $result = DB::transaction(function () use ($gameId, $tileIndex): array {
+            $game = Game::query()
+                ->with('tiles')
+                ->lockForUpdate()
+                ->find($gameId);
 
-        return [
-            'tileImage' => asset('assets/'.random_int(1, 7).'.png'),
-        ] + ($currentMove >= 10 ? ['message' => 'You lost!'] : []);
+            if (! $game) {
+                return [
+                    'status' => Response::HTTP_NOT_FOUND,
+                    'body' => ['message' => 'Game not found.'],
+                ];
+            }
+
+            if ($game->is_finished) {
+                return [
+                    'status' => Response::HTTP_OK,
+                    'body' => ['message' => 'Game has already finished.'],
+                ];
+            }
+
+            if (!$game->is_valid) {
+                return [
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                    'body' => ['message' => 'Game is not valid. '. ($game->campaign?->is_active ? 'Please contact support.' : 'Campaign is not active.')],
+                ];
+            }
+
+            $tile = $game->tiles->firstWhere('tile_index', $tileIndex);
+            if (! $tile) {
+                return [
+                    'status' => Response::HTTP_UNPROCESSABLE_ENTITY,
+                    'body' => ['message' => 'An error occurred while processing the tile. Please contact support.'],
+                ];
+            }
+
+            if ($game->finished_at !== null) {
+                return [
+                    'status' => Response::HTTP_OK,
+                    'body' => [
+                        'tileImage' => $tile->tile_image,
+                        'message' => $game->prize_id ? 'You won a prize!' : 'Game has ended.',
+                    ],
+                ];
+            }
+
+            if ($tile->revealed_at === null) {
+                $tile->revealed_at = now();
+                $tile->save();
+            }
+
+            $matchCount = $game->tiles()
+                ->where('prize_id', $tile->prize_id)
+                ->whereNotNull('revealed_at')
+                ->count();
+
+            $revealedCount = $game->tiles()
+                ->whereNotNull('revealed_at')
+                ->count();
+
+            $response = [
+                'tileImage' => $tile->tile_image,
+            ];
+
+            if ($matchCount >= 3) {
+                $this->gameSessionService->finalizeGame($game);
+
+                $response['message'] = 'You won a prize!';
+            } else if ($revealedCount === $game->tiles->count()) {
+                $this->gameSessionService->finalizeGame($game);
+
+                $response['message'] = 'Game has ended.';
+            }
+
+            return [
+                'status' => Response::HTTP_OK,
+                'body' => $response,
+            ];
+        });
+
+        return response()->json($result['body'], $result['status']);
     }
 }
