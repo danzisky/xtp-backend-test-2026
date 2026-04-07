@@ -142,7 +142,7 @@ final class GameBoardPlannerService
                 Log::warning('Regenerating losing board due to accidental winning combination.', ['board' => $board->toArray()]);
             }
             $attempt++;
-        } while ($builtWinningBoard && $attempt < $maxBuildAttempts); // Ensure we don't accidentally create a winning board by having too many of the same prize.
+        } while ($builtWinningBoard && $attempt < $maxBuildAttempts); // Ensure we don't accidentally create a winning board by having too many of the same prize. This shouldn't happen and is only a safeguard if a method/logic changes, or unforeseen edge cases.
 
         if ($builtWinningBoard) {
             throw new DomainException('Unable to build a losing board without accidentally creating a winning combination after multiple attempts.');
