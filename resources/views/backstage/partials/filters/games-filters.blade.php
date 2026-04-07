@@ -1,11 +1,11 @@
 <div class="grid grid-cols-5 gap-1">
-    <input wire:loading.attr="disabled" type="text" id="wire-account" wire:model.live="account" placeholder=" Account"
+    <input wire:loading.attr="disabled" type="text" id="wire-account" wire:model.lazy="account" placeholder=" Account"
            class="h-10 border border-gray-300 rounded-lg mr-4">
-    <input wire:loading.attr="disabled" type="number" id="wire-account" wire:model.live="prizeId" placeholder=" Prize ID"
+    <input wire:loading.attr="disabled" type="number" id="wire-account" wire:model.lazy="prizeId" placeholder=" Prize ID"
            class="h-10 border border-gray-300 rounded-lg mr-4">
-    <input wire:loading.attr="disabled" type="text" wire:model.live="startDate" id="wire-starts" placeholder=" Start Date"
+    <input wire:loading.attr="disabled" type="text" wire:model.lazy="startDate" id="wire-starts" placeholder=" Start Date" value="{{ $startDate }}"
            class="h-10 border border-gray-300 rounded-lg mr-4">
-    <input type="text" wire:model.live="endDate" id="wire-ends" placeholder=" End Date"
+    <input wire:loading.attr="disabled" type="text" wire:model.lazy="endDate" id="wire-ends" placeholder=" End Date" value="{{ $endDate }}"
            class="h-10 border border-gray-300 rounded-lg mr-4">
 
     <button wire:click="$dispatch('cleanAll')" class="h-10 bg-white hover:bg-gray-100 text-gray-800
@@ -16,34 +16,35 @@
 
 @push('js')
     <script>
-        Livewire.on('cleanAll', function () {
-        @this.set('account', '');
-        @this.set('prizeId', '');
-        @this.set('startDate', '');
-        @this.set('endDate', '');
-        });
+        document.addEventListener('DOMContentLoaded', function () {
+            Livewire.on('cleanAll', function () {
+            @this.set('account', '');
+            @this.set('prizeId', '');
+            @this.set('startDate', '');
+            @this.set('endDate', '');
+            });
 
-        flatpickr("#wire-starts", {
-            allowInput: true,
-            enableSeconds: true,
-            dateFormat: 'd-m-Y H:i:S',
-            defaultHour: 0,
-            defaultMinute: 0,
-            defaultSeconds: 0,
-            enableTime: true,
-            time_24hr: true,
-        });
+            flatpickr("#wire-starts", {
+                allowInput: true,
+                enableSeconds: true,
+                dateFormat: 'd-m-Y H:i:S',
+                defaultHour: 0,
+                defaultMinute: 0,
+                defaultSeconds: 0,
+                enableTime: true,
+                time_24hr: true,
+            });
 
-        flatpickr("#wire-ends", {
-            allowInput: true,
-            enableSeconds: true,
-            dateFormat: 'd-m-Y H:i:S',
-            defaultHour: 23,
-            defaultMinute: 59,
-            defaultSeconds: 59,
-            enableTime: true,
-            time_24hr: true,
+            flatpickr("#wire-ends", {
+                allowInput: true,
+                enableSeconds: true,
+                dateFormat: 'd-m-Y H:i:S',
+                defaultHour: 23,
+                defaultMinute: 59,
+                defaultSeconds: 59,
+                enableTime: true,
+                time_24hr: true,
+            });
         });
-
     </script>
 @endpush

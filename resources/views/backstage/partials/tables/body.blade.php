@@ -16,6 +16,14 @@
                                     @php($modelname = $column['model'])
                                     @php($param = $column['param'])
                                     @modelname($row, $modelname, $param)
+                            @elseif( isset($column['nested']) )
+                                @php($nested = $column['nested'])
+                                {{ data_get($row, $nested) }}
+                            @elseif( isset($column['image']) )
+                                @php($imagePath = $row->{$column['image']} ?? null)
+                                @if($imagePath)
+                                    <img crossorigin="anonymous" src="{{ $imagePath }}" class="w-10 h-10 aspect-square rounded object-cover" alt="Image">
+                                @endif
                             @else
                                 {{ $row->{$column['title']} ?? '' }}
                             @endif

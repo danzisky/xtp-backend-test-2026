@@ -12,6 +12,15 @@ class PrizeTable extends TableComponent
     {
         $columns = [
             [
+                'title' => 'id',
+                'sort' => true,
+            ],
+            [
+                'title' => 'image',
+                'image' => 'image',
+                'sort' => false,
+            ],
+            [
                 'title' => 'name',
                 'sort' => true,
             ],
@@ -23,6 +32,12 @@ class PrizeTable extends TableComponent
                 'title' => 'weight',
                 'sort' => true,
             ],
+            [
+                'title' => 'daily limit',
+                'attribute' => 'daily_limit',
+                'sort' => true,
+            ],
+
             [
                 'title' => 'starts_at',
                 'sort' => true,

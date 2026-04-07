@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Game extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['campaign_id', 'prize_id', 'account', 'segment', 'finished_at'];
+    protected $fillable = ['campaign_id', 'prize_id', 'status', 'account', 'segment', 'finished_at', 'matches_to_win', 'max_tries'];
 
     protected function casts(): array
     {
@@ -19,12 +22,52 @@ class Game extends Model
         ];
     }
 
+    protected $appends = [
+        'is_finished',
+        'is_valid',
+        'can_sratch_tiles',
+    ];
+
     public static function filter(?string $account = null, ?int $prizeId = null, ?string $fromDate = null, ?string $tillDate = null)
     {
         $query = self::query();
         $campaign = Campaign::find(session('activeCampaign'));
 
-        // When filtering by dates, keep in mind `finished_at` should be stored in Campaign timezone
+        if ($campaign) {
+            $query->where('games.campaign_id', $campaign->id);
+        }
+
+        if ($account) {
+            $query->where('games.account', 'like', '%' . $account . '%');
+        }
+
+        if ($prizeId) {
+            $query->where('games.prize_id', $prizeId);
+        }
+
+        // Date inputs represent days in the campaign's timezone.
+        // Convert to UTC boundaries before comparing the stored UTC timestamp.
+        $tz = $campaign?->timezone ?? 'UTC';
+
+        if ($fromDate) {
+            try {
+                Carbon::parse($fromDate, $tz);
+            } catch (\Exception $e) {
+                return $query;
+            }
+
+            $query->where('finished_at', '>=', Carbon::parse($fromDate, $tz)->startOfDay()->utc());
+        }
+
+        if ($tillDate) {
+            try {
+                Carbon::parse($tillDate, $tz);
+            } catch (\Exception $e) {
+                return $query;
+            }
+
+            $query->where('finished_at', '<=', Carbon::parse($tillDate, $tz)->endOfDay()->utc());
+        }
 
         return $query;
     }
@@ -37,5 +80,41 @@ class Game extends Model
     public function prize(): BelongsTo
     {
         return $this->belongsTo(Prize::class);
+    }
+
+    public function tiles(): HasMany
+    {
+        return $this->hasMany(GameTile::class);
+    }
+
+    public function unscratchedTiles(): HasMany
+    {
+        return $this->tiles()->unrevealed();
+    }
+
+    public function scratchedTiles(): HasMany
+    {
+        return $this->tiles()->revealed();
+    }
+
+    public function canScratchTiles(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->scratchedTiles()->count() < $this->max_tries,
+        );
+    }
+
+    public function isFinished(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->finished_at !== null,
+        );
+    }
+
+    public function isValid(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => !$this->finished_at && $this?->campaign?->is_active,
+        );
     }
 }

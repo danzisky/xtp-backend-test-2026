@@ -1,0 +1,19 @@
+- games
+  - Add unique constraints for campaign_id, account an d segment
+  - Index campaign_id, account, segment
+- game_tiles
+  - id
+  - game_id
+  - tile_index
+  - prize_id
+  - image
+  - revealed_at
+  - unique key constraints on game_id and tile_index
+- prize_daily_counters
+  - id
+  - prize_id
+  - counter_date
+  - limit (get from prizes table and keep here incase updated. should also add limit column on prizes table)
+  - wins
+  - unique constraint prize_id and counter_date
+- will keep indexes in mind, for tables

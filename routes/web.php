@@ -22,5 +22,6 @@ Route::prefix('backstage')->name('backstage.')->middleware(['auth', 'setActiveCa
     Route::resource('users', UserController::class);
 });
 
-Route::get('{campaign:slug}', [FrontendController::class, 'loadCampaign']);
+Route::get('{campaign:slug}', [FrontendController::class, 'loadCampaign'])
+    ->middleware('throttle:campaign-load');
 Route::get('/', [FrontendController::class, 'placeholder']);
