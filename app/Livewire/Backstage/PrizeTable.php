@@ -16,6 +16,11 @@ class PrizeTable extends TableComponent
                 'sort' => true,
             ],
             [
+                'title' => 'image',
+                'image' => 'image',
+                'sort' => false,
+            ],
+            [
                 'title' => 'name',
                 'sort' => true,
             ],
