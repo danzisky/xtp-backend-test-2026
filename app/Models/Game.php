@@ -50,10 +50,22 @@ class Game extends Model
         $tz = $campaign?->timezone ?? 'UTC';
 
         if ($fromDate) {
+            try {
+                Carbon::parse($fromDate, $tz);
+            } catch (\Exception $e) {
+                return $query;
+            }
+
             $query->where('finished_at', '>=', Carbon::parse($fromDate, $tz)->startOfDay()->utc());
         }
 
         if ($tillDate) {
+            try {
+                Carbon::parse($tillDate, $tz);
+            } catch (\Exception $e) {
+                return $query;
+            }
+
             $query->where('finished_at', '<=', Carbon::parse($tillDate, $tz)->endOfDay()->utc());
         }
 

@@ -12,6 +12,10 @@ class PrizeTable extends TableComponent
     {
         $columns = [
             [
+                'title' => 'id',
+                'sort' => true,
+            ],
+            [
                 'title' => 'name',
                 'sort' => true,
             ],
