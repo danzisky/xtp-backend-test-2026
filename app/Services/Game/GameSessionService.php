@@ -6,6 +6,7 @@ use App\Data\Game\GameContextData;
 use App\Enums\GameMessage;
 use App\Enums\GameStatus;
 use App\Models\Game;
+use App\Models\GameTile;
 use App\Models\Prize;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,8 +19,7 @@ final class GameSessionService
     public function __construct(
         private PrizeAvailabilityService $prizeAvailability,
         private GameBoardPlannerService $boardPlanner
-    ) {
-    }
+    ) {}
 
     /**
      * Get an open game session for the given context or create a new one if none exists. This ensures that a player can only have one active game session per campaign and segment.
@@ -99,15 +99,19 @@ final class GameSessionService
                     ->pluck('image', 'id');
 
                 $rows = [];
+                $now = now();
                 foreach ($boardPlan->tiles as $index => $prizeId) {
                     $rows[] = [
+                        'game_id' => $game->id,
                         'prize_id' => $prizeId,
                         'tile_index' => $index,
                         'tile_image' => (string) $prizeImages->get($prizeId, ''),
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                 }
 
-                $game->tiles()->createMany($rows);
+                GameTile::query()->insert($rows);
 
                 Log::info('Game created', [
                     'game_id' => $game->id,
