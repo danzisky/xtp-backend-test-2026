@@ -152,21 +152,29 @@ final class GameSessionService
 
         try {
             DB::transaction(function () use ($game, $won) {
+                $shouldWin = $won && $game->prize_id !== null;
+
+                if ($won && $game->prize_id === null) {
+                    Log::warning('Game marked won without reserved prize; forcing loss status', [
+                        'game_id' => $game->id,
+                    ]);
+                }
+
                 if ($game->prize_id !== null) {
                     $prize = Prize::query()->find($game->prize_id);
 
-                    if ($prize && $won) {
+                    if ($prize && $shouldWin) {
                         $this->prizeAvailability->markAwarded($prize, $game->campaign);
                         $game->status = GameStatus::WON->value;
-                    } elseif ($prize && ! $won) {
+                    } elseif ($prize) {
                         $this->prizeAvailability
                             ->releaseReservation($prize, $game->campaign);
                         $game->status = GameStatus::LOST->value;
+                    } else {
+                        $game->status = GameStatus::LOST->value;
                     }
                 } else {
-                    $game->status = $won
-                        ? GameStatus::WON->value
-                        : GameStatus::LOST->value;
+                    $game->status = GameStatus::LOST->value;
                 }
 
                 $game->finished_at = now();

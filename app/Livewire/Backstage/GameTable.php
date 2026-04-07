@@ -24,6 +24,10 @@ class GameTable extends TableComponent
     {
         $columns = [
             [
+                'title' => 'id',
+                'sort' => true,
+            ],
+            [
                 'title' => 'account',
                 'sort' => true,
             ],

@@ -71,7 +71,11 @@ class ApiController extends Controller
 
                 $body = ['tileImage' => $tile->tile_image];
 
-                if ($matchCount >= $game->matches_to_win) {
+                if (
+                    $game->prize_id !== null
+                    && (int) $tile->prize_id === (int) $game->prize_id
+                    && $matchCount >= $game->matches_to_win
+                ) {
                     $this->gameSessionService->finalizeGame($game, true);
                     Log::info('Player won game', ['gameId' => $gameId, 'prizeId' => $game->prize_id, 'account' => $game->account]);
                     $body['message'] = GameMessage::PRIZE_WON->value;

@@ -167,6 +167,49 @@ class ApiFlipFlowTest extends TestCase
         $this->assertSame(GameStatus::LOST->value, $game->status);
     }
 
+    public function test_flip_does_not_mark_win_without_reserved_prize(): void
+    {
+        $campaign = $this->createCampaign();
+        $prize = $this->createPrize(
+            $campaign,
+            PrizeSegment::Low->value,
+            ['image' => 'https://example.test/no-prize-win.png']
+        );
+
+        $game = $this->createGame(
+            $campaign,
+            [
+                'account' => 'player-1',
+                'segment' => PrizeSegment::Low->value,
+                'prize_id' => null,
+                'matches_to_win' => 3,
+                'max_tries' => 3,
+            ]
+        );
+
+        foreach (range(0, 2) as $index) {
+            $this->createTile(
+                $game,
+                $prize,
+                $index,
+                ['tile_image' => 'https://example.test/no-prize-win.png']
+            );
+        }
+
+        $this->postJson(route('api.flip'), ['gameId' => $game->id, 'tileIndex' => 0])->assertOk();
+        $this->postJson(route('api.flip'), ['gameId' => $game->id, 'tileIndex' => 1])->assertOk();
+
+        $final = $this->postJson(route('api.flip'), ['gameId' => $game->id, 'tileIndex' => 2]);
+
+        $final->assertOk()->assertJson([
+            'message' => GameMessage::NO_MORE_TRIES->value,
+        ]);
+
+        $game->refresh();
+        $this->assertNotNull($game->finished_at);
+        $this->assertSame(GameStatus::LOST->value, $game->status);
+    }
+
     public function test_flip_rejects_invalid_payload(): void
     {
         $response = $this->postJson(

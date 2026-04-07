@@ -7,6 +7,7 @@ use App\Data\Game\GameContextData;
 use App\Models\Prize;
 use DomainException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Service responsible for planning the game board for new game sessions based on campaign and player context, ensuring compliance with prize constraints and game rules.
@@ -132,7 +133,20 @@ final class GameBoardPlannerService
     {
         $prizeIds = $eligiblePrizes->pluck('id')->values();
         $maxFillerAppearances = $matchesToWin - 1;
-        $board = $this->sampleNTiles($prizeIds, $boardSize * $boardSize, $maxFillerAppearances);
+        $maxBuildAttempts = 5;
+        $attempt = 0;
+        do {
+            $board = $this->sampleNTiles($prizeIds, $boardSize * $boardSize, $maxFillerAppearances);
+            $builtWinningBoard = $board->countBy()->max() >= $matchesToWin;
+            if ($builtWinningBoard) {
+                Log::warning('Regenerating losing board due to accidental winning combination.', ['board' => $board->toArray()]);
+            }
+            $attempt++;
+        } while ($builtWinningBoard && $attempt < $maxBuildAttempts); // Ensure we don't accidentally create a winning board by having too many of the same prize.
+
+        if ($builtWinningBoard) {
+            throw new DomainException('Unable to build a losing board without accidentally creating a winning combination after multiple attempts.');
+        }
 
         return new BoardPlanData(
             isWinner: false,
@@ -154,10 +168,12 @@ final class GameBoardPlannerService
         int $n,
         int $maxPerPrize,
     ): Collection {
-        $sample = $eligiblePrizes->unique();
+        $uniquePrizeIds = $eligiblePrizes->unique()->values();
+        $sample = collect();
 
-        for ($i = 0; $i < $maxPerPrize; $i++) { // Allow up to $maxPerPrize duplicates of each prize
-            $sample = $sample->merge($eligiblePrizes)->shuffle();
+        // Allow up to $maxPerPrize duplicates of each prize
+        for ($i = 0; $i < $maxPerPrize; $i++) {
+            $sample = $sample->merge($uniquePrizeIds);
         }
 
         return $sample->shuffle()->take($n)->values();
